@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Meep: Python current example (Debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": [],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/out/build/windows-msvc-debug/python",
+        "MPLBACKEND": "TkAgg",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      },
+      "preLaunchTask": "Meep: build Debug"
+    },
+    {
+      "name": "Meep: Python straight-waveguide (Debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "program": "${workspaceFolder}/python/examples/straight-waveguide.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": [],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/out/build/windows-msvc-debug/python",
+        "MPLBACKEND": "TkAgg",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      },
+      "preLaunchTask": "Meep: build Debug"
+    }
+  ]
+}

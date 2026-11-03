@@ -1,0 +1,15 @@
+{
+  "description": "Additional stress inputs found while checking reproducibility. Upstream prism near-edge classification can produce an extra intersection; these are known failures, not part of the seed-1 baseline.",
+  "environmentVariable": "LIBCTL_TEST_PRISM_SEED",
+  "configuration": "MSVC x64 Debug, libctl 4.7.1, rand from MSVC CRT",
+  "seeds": [1792200798, 1792200802, 1792200809, 1792200818],
+  "example": {
+    "seed": 1792200798,
+    "point": [-0.12315744499038667, -0.618640705587939, -0.9029663991210669],
+    "direction": [0.4614457534454833, -0.017794058904546203, 0.8869899594103824],
+    "interval": [0.7317117831965087, 0.9320963164159063],
+    "blockIntersection": 0.20038453321939764,
+    "prismIntersection": 0,
+    "prismRoots": [0.5165599242841071, 0.518411532830978, 1.601962516379192]
+  }
+}

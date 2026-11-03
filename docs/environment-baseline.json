@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-11-03",
+  "sourceVersion": "1.35.0+msvc2",
+  "platform": "Windows-11-10.0.22000-SP0",
+  "python": "3.12.0 (tags/v3.12.0:0fb18b0, Oct  2 2023, 13:03:39) [MSC v.1935 64 bit (AMD64)]",
+  "visualStudio": {
+    "version": "17.7.34221.43",
+    "toolset": "14.37.32822",
+    "windowsSdk": "10.0.22621.0"
+  },
+  "compilerVersion": "19.37.32825.0",
+  "oneMKL": {
+    "version": "2025.3.0",
+    "interface": "lp64",
+    "threading": "sequential",
+    "link": "dynamic",
+    "sha256": {
+      "include/mkl_version.h": "b8514817671f8486c91b72c121e678228b33035ef615a395b791aed791cb899d",
+      "lib/cmake/mkl/MKLConfig.cmake": "9066f91351bc01ad8c776bdf7456c46e13552dc172d1b83906e120f35673f2b8",
+      "bin/mkl_core.2.dll": "96080d61cb5c2b4505e02ea3f7e5ac78f6328a526f0e9adf1294bac2bb679183",
+      "bin/mkl_sequential.2.dll": "31329514e84b12a4e3527bdd9720e44c985d3103c1d5a480a81c324839fcf3c9"
+    }
+  },
+  "packages": {
+    "autograd": "1.9.1",
+    "build": "1.6.1",
+    "cmake": "3.31.10",
+    "colorama": "0.4.6",
+    "contourpy": "1.4.0",
+    "cycler": "0.12.1",
+    "fonttools": "4.67.0",
+    "h5py": "3.16.0",
+    "iniconfig": "2.3.1",
+    "kiwisolver": "1.5.1",
+    "matplotlib": "3.11.2",
+    "ninja": "1.13.2",
+    "numpy": "2.4.1",
+    "packaging": "26.3",
+    "parameterized": "0.9.0",
+    "pathspec": "1.1.1",
+    "pillow": "13.0.0",
+    "pluggy": "1.7.0",
+    "Pygments": "2.21.0",
+    "pyparsing": "3.3.3",
+    "pyproject_hooks": "1.3.3",
+    "pytest": "9.1.1",
+    "python-dateutil": "2.9.0.post0",
+    "scikit_build_core": "1.1.1",
+    "scipy": "1.18.1",
+    "six": "1.17.0",
+    "swig": "4.5.1"
+  },
+  "notebookPackages": {
+    "asttokens": "3.0.2",
+    "attrs": "26.1.0",
+    "comm": "0.2.3",
+    "debugpy": "1.8.22",
+    "executing": "2.3.0",
+    "fastjsonschema": "2.22.2",
+    "imageio-ffmpeg": "0.6.0",
+    "ipykernel": "7.4.0",
+    "ipython": "9.17.1",
+    "ipython_pygments_lexers": "1.1.1",
+    "jedi": "0.20.1",
+    "jsonschema-specifications": "2025.9.1",
+    "jsonschema": "4.26.0",
+    "jupyter_client": "8.10.0",
+    "jupyter_core": "5.9.1",
+    "matplotlib-inline": "0.2.2",
+    "nbclient": "0.11.0",
+    "nbformat": "5.11.1",
+    "nest-asyncio2": "1.7.4",
+    "parso": "0.8.7",
+    "platformdirs": "4.13.3",
+    "prompt_toolkit": "3.0.53",
+    "psutil": "7.2.2",
+    "pure_eval": "0.2.4",
+    "pyzmq": "27.2.0",
+    "referencing": "0.37.0",
+    "rpds-py": "2026.9.1",
+    "stack-data": "0.6.3",
+    "tornado": "6.5.10",
+    "traitlets": "5.16.1",
+    "typing_extensions": "4.16.0",
+    "wcwidth": "0.9.2"
+  },
+  "requirementsSha256": {
+    "requirements-windows.lock.txt": "7d356f9ec4bcf6fa06eb78e9b9cbcaf83330bc3a279e79dd2332987721f4871d",
+    "requirements-notebooks.lock.txt": "5aad68e96db1a81b55e1e2899adf03f19b8d8cb39135beedfa7ed5890164ec25"
+  },
+  "validation": {
+    "scope": "Current Windows computer; a second physical computer has not been tested.",
+    "doctor": {
+      "passed": true,
+      "errors": []
+    },
+    "pipCheck": {
+      "passed": true
+    },
+    "releaseSmoke": {
+      "passed": true,
+      "checks": [
+        "PML time stepping",
+        "finite nonzero field",
+        "HDF5 write/read",
+        "MPB eigenmode",
+        "bundled MKL DLL loading"
+      ],
+      "fieldMaximum": 1.34344113530989,
+      "mpbFrequency": 0.2,
+      "mpbKx": 0.19999999999999973
+    },
+    "debugSimulation": {
+      "passed": true,
+      "fieldShape": [
+        40,
+        40
+      ],
+      "fieldMaximum": 1.34344113530989
+    },
+    "releaseCTest": {
+      "passed": true,
+      "tests": 10,
+      "failures": 0
+    },
+    "releasePythonRegression": {
+      "passed": true,
+      "run": 115,
+      "passedTests": 114,
+      "skipped": 1,
+      "skipReason": "MPI is unavailable in the serial build"
+    },
+    "sourceArchive": {
+      "passed": true,
+      "checks": [
+        "reproduction guide included",
+        "environment baseline included",
+        "shared CMake and line-ending settings included"
+      ]
+    }
+  }
+}

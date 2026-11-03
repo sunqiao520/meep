@@ -1,0 +1,11 @@
+Add more example files: more 3d crystals, strip waveguide, ...
+
+Export/import DXF, VRML, POV, ...?  Import full epsilon tensor from a file.
+
+Make mpb-data pick default -n when -r is used.
+
+More eigensolver improvements...adaptive selection of an iteration technique?
+
+Try Jacobi-Davidson method with harmonic eigenvalues for targeted solver.
+
+World domination.

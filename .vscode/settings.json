@@ -1,0 +1,8 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.envFile": "${workspaceFolder}/.vscode/notebook.local.env",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/out/build/windows-msvc-debug/python"
+  ],
+  "cmake.configureOnOpen": false
+}

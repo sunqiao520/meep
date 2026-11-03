@@ -1,0 +1,6 @@
+set(HARMINV_ROOT "${PROJECT_SOURCE_DIR}/third_party/harminv")
+configure_file(config.h.in "${CMAKE_CURRENT_BINARY_DIR}/config.h" @ONLY)
+set_source_files_properties("${HARMINV_ROOT}/harminv.c" PROPERTIES LANGUAGE CXX)
+add_library(harminv STATIC "${HARMINV_ROOT}/harminv.c")
+target_include_directories(harminv PUBLIC "${HARMINV_ROOT}" PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(harminv PUBLIC meep_numerics)

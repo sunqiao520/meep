@@ -1,0 +1,72 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 26, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows-msvc-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "architecture": { "value": "x64", "strategy": "external" },
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.venv/Scripts/ninja.exe",
+        "Python_EXECUTABLE": "${sourceDir}/.venv/Scripts/python.exe",
+        "MEEP_BUILD_PYTHON": true,
+        "MEEP_BUILD_TESTS": true,
+        "MEEP_BUILD_EXAMPLES": true,
+        "MEEP_BUILD_SCHEME": false,
+        "MEEP_WITH_HARMINV": true,
+        "MEEP_WITH_MPB": true
+      },
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": { "hostOS": ["Windows"] }
+      }
+    },
+    {
+      "name": "windows-msvc-release",
+      "displayName": "Windows x64 Release",
+      "inherits": "windows-msvc-base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "windows-msvc-relwithdebinfo",
+      "displayName": "Windows x64 RelWithDebInfo",
+      "description": "Optimized native build with debugging symbols and standard CPython",
+      "inherits": "windows-msvc-base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "windows-msvc-debug",
+      "displayName": "Windows x64 Debug",
+      "description": "Unoptimized build using the /MD runtime for standard CPython",
+      "inherits": "windows-msvc-base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-msvc-release", "configurePreset": "windows-msvc-release", "jobs": 4 },
+    { "name": "windows-msvc-relwithdebinfo", "configurePreset": "windows-msvc-relwithdebinfo", "jobs": 4 },
+    { "name": "windows-msvc-debug", "configurePreset": "windows-msvc-debug", "jobs": 4 }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-msvc-release",
+      "configurePreset": "windows-msvc-release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "windows-msvc-relwithdebinfo",
+      "configurePreset": "windows-msvc-relwithdebinfo",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "windows-msvc-debug",
+      "configurePreset": "windows-msvc-debug",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

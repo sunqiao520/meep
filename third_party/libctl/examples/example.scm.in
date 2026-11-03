@@ -1,0 +1,64 @@
+; Copyright (C) 1998-2020 Massachusetts Institute of Technology and Steven G. Johnson
+;
+; This file may be used without restriction.  It is in the public
+; domain, and is NOT restricted by the terms of any GNU license.
+;
+; This library is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+; Lesser General Public License for more details.
+
+(define-class material-type no-parent
+  (define-property epsilon no-default 'number positive?)
+  (define-property conductivity 0.0 'number))
+
+; use the solid geometry classes, variables, etcetera in libgeom:
+; (one specifications file can include another specifications file)
+(include "@LIBCTL_DIR@/utils/geom.scm")
+
+; ****************************************************************
+
+; Add some predefined variables, for convenience:
+
+(define vacuum (make material-type (epsilon 1.0)))
+(define air vacuum)
+
+(define infinity 1.0e20) ; big number for infinite dimensions of objects
+
+(set! default-material air)
+
+; ****************************************************************
+
+(define-input-var k-points '() (make-list-type 'vector3))
+
+(define-input-output-var dummy (vector3 3.7+1.1i 2.3-0.1i 19) 'cvector3)
+
+(define-output-var mean-dielectric 'number)
+
+(define-output-var gaps (make-list-type 'number))
+
+(export-type (make-list-type 'number))
+(export-type (make-list-type (make-list-type 'number)))
+
+; ****************************************************************
+
+(define-external-function run-program true true
+  no-return-value)
+
+(define (run)
+  (set! interactive? #f)  ; don't be interactive if we call (run)
+  (run-program))
+
+(define-external-function energy-in-object false false
+  'number 'geometric-object)
+
+(define-external-function list-func-test false false
+  (make-list-type 'vector3) 'number (make-list-type 'integer) 'vector3)
+
+(define-external-function function-func false false 'number
+  'function 'number)
+
+; ****************************************************************
+
+; Use "example>" instead of the default "guile>" prompt.
+(ctl-set-prompt! "example> ")

@@ -1,0 +1,5 @@
+#pragma once
+/* oneMKL Windows LP64 Fortran-style symbols; source uses its C++ complex path. */
+#define F77_FUNC(lower, UPPER) lower
+#define F77_FUNC_(lower, UPPER) lower
+#define HAVE_CARG 1

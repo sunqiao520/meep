@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "meep": "@PROJECT_VERSION@",
+  "configuration": "@CMAKE_BUILD_TYPE@",
+  "compiler": "@CMAKE_CXX_COMPILER@",
+  "compilerVersion": "@CMAKE_CXX_COMPILER_VERSION@",
+  "cmake": "@CMAKE_VERSION@",
+  "python": "@Python_EXECUTABLE@",
+  "oneMKL": "@MKL_VERSION@",
+  "mklRoot": "@MKL_ROOT@",
+  "mklRuntime": "@MEEP_MKL_RUNTIME_DIR@",
+  "mklLicense": "@MEEP_MKL_LICENSE@",
+  "interface": "lp64",
+  "threading": "sequential"
+}

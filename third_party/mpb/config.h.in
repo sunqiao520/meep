@@ -1,0 +1,302 @@
+/* config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* Define to disable sanity checks in code */
+#undef CHECK_DISABLE
+
+/* Define to turn on debugging checks */
+#undef DEBUG
+
+/* Define to use debugging malloc/free */
+#undef DEBUG_MALLOC
+
+/* Define when using the profiler tool */
+#undef ENABLE_PROF
+
+/* Define to dummy 'main' function (if any) required to link to the Fortran
+   libraries. */
+#undef F77_DUMMY_MAIN
+
+/* Define to a macro mangling the given C identifier (in lower and upper
+   case), which must not contain underscores, for linking with Fortran. */
+#undef F77_FUNC
+
+/* As F77_FUNC, but for C identifiers containing underscores. */
+#undef F77_FUNC_
+
+/* Define if F77 and FC dummy 'main' functions are identical. */
+#undef FC_DUMMY_MAIN_EQ_F77
+
+/* Define if you have a BLAS library. */
+#undef HAVE_BLAS
+
+/* Define if fenv.h declares this. */
+#undef HAVE_DECL_FEENABLEEXCEPT
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the 'feenableexcept' function. */
+#undef HAVE_FEENABLEEXCEPT
+
+/* Define to 1 if you have the 'getopt' function. */
+#undef HAVE_GETOPT
+
+/* Define to 1 if you have the <getopt.h> header file. */
+#undef HAVE_GETOPT_H
+
+/* Define to 1 if you have the <guile/gh.h> header file. */
+#undef HAVE_GUILE_GH_H
+
+/* Define to 1 if you have the 'H5Pset_fapl_mpio' function. */
+#undef HAVE_H5PSET_FAPL_MPIO
+
+/* Define to 1 if you have the 'H5Pset_mpi' function. */
+#undef HAVE_H5PSET_MPI
+
+/* Define if we have & link HDF5 */
+#undef HAVE_HDF5
+
+/* Define to 1 if you have the <hdf5.h> header file. */
+#undef HAVE_HDF5_H
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define if you have LAPACK library. */
+#undef HAVE_LAPACK
+
+/* Define to 1 if you have the 'ctl' library (-lctl). */
+#undef HAVE_LIBCTL
+
+/* If we have the libctl_quiet variable */
+#undef HAVE_LIBCTL_QUIET
+
+/* Define to 1 if you have the 'dfftw' library (-ldfftw). */
+#undef HAVE_LIBDFFTW
+
+/* Define to 1 if you have the 'dfftw_mpi' library (-ldfftw_mpi). */
+#undef HAVE_LIBDFFTW_MPI
+
+/* Define to 1 if you have the 'dl' library (-ldl). */
+#undef HAVE_LIBDL
+
+/* Define to 1 if you have the 'drfftw' library (-ldrfftw). */
+#undef HAVE_LIBDRFFTW
+
+/* Define to 1 if you have the 'drfftw_mpi' library (-ldrfftw_mpi). */
+#undef HAVE_LIBDRFFTW_MPI
+
+/* Define to 1 if you have the 'efence' library (-lefence). */
+#undef HAVE_LIBEFENCE
+
+/* Define to 1 if you have the 'fftw' library (-lfftw). */
+#undef HAVE_LIBFFTW
+
+/* Define to 1 if you have the 'fftw3' library (-lfftw3). */
+#undef HAVE_LIBFFTW3
+
+/* Define to 1 if you have the 'fftw3f' library (-lfftw3f). */
+#undef HAVE_LIBFFTW3F
+
+/* Define to 1 if you have the 'fftw3f_mpi' library (-lfftw3f_mpi). */
+#undef HAVE_LIBFFTW3F_MPI
+
+/* Define to 1 if you have the 'fftw3f_omp' library (-lfftw3f_omp). */
+#undef HAVE_LIBFFTW3F_OMP
+
+/* Define to 1 if you have the 'fftw3l' library (-lfftw3l). */
+#undef HAVE_LIBFFTW3L
+
+/* Define to 1 if you have the 'fftw3l_mpi' library (-lfftw3l_mpi). */
+#undef HAVE_LIBFFTW3L_MPI
+
+/* Define to 1 if you have the 'fftw3l_omp' library (-lfftw3l_omp). */
+#undef HAVE_LIBFFTW3L_OMP
+
+/* Define to 1 if you have the 'fftw3_mpi' library (-lfftw3_mpi). */
+#undef HAVE_LIBFFTW3_MPI
+
+/* Define to 1 if you have the 'fftw3_omp' library (-lfftw3_omp). */
+#undef HAVE_LIBFFTW3_OMP
+
+/* Define to 1 if you have the 'fftw_mpi' library (-lfftw_mpi). */
+#undef HAVE_LIBFFTW_MPI
+
+/* Define to 1 if you have the 'guile' library (-lguile). */
+#undef HAVE_LIBGUILE
+
+/* Define to 1 if you have the <libguile.h> header file. */
+#undef HAVE_LIBGUILE_H
+
+/* Define to 1 if you have the 'guile-ltdl' library (-lguile-ltdl). */
+#undef HAVE_LIBGUILE_LTDL
+
+/* Define to 1 if you have the 'ltdl' library (-lltdl). */
+#undef HAVE_LIBLTDL
+
+/* Define to 1 if you have the 'm' library (-lm). */
+#undef HAVE_LIBM
+
+/* Define to 1 if you have the 'readline' library (-lreadline). */
+#undef HAVE_LIBREADLINE
+
+/* Define to 1 if you have the 'rfftw' library (-lrfftw). */
+#undef HAVE_LIBRFFTW
+
+/* Define to 1 if you have the 'rfftw_mpi' library (-lrfftw_mpi). */
+#undef HAVE_LIBRFFTW_MPI
+
+/* Define to 1 if you have the 'sfftw' library (-lsfftw). */
+#undef HAVE_LIBSFFTW
+
+/* Define to 1 if you have the 'sfftw_mpi' library (-lsfftw_mpi). */
+#undef HAVE_LIBSFFTW_MPI
+
+/* Define to 1 if you have the 'srfftw' library (-lsrfftw). */
+#undef HAVE_LIBSRFFTW
+
+/* Define to 1 if you have the 'srfftw_mpi' library (-lsrfftw_mpi). */
+#undef HAVE_LIBSRFFTW_MPI
+
+/* Define to 1 if you have the 'xfftw' library (-lxfftw). */
+#undef HAVE_LIBXFFTW
+
+/* Define to 1 if you have the 'xfftw_mpi' library (-lxfftw_mpi). */
+#undef HAVE_LIBXFFTW_MPI
+
+/* Define to 1 if you have the 'xrfftw' library (-lxrfftw). */
+#undef HAVE_LIBXRFFTW
+
+/* Define to 1 if you have the 'xrfftw_mpi' library (-lxrfftw_mpi). */
+#undef HAVE_LIBXRFFTW_MPI
+
+/* Define to 1 if you have the 'z' library (-lz). */
+#undef HAVE_LIBZ
+
+/* Define if you have & link an MPI library. */
+#undef HAVE_MPI
+
+/* Have nlopt lib */
+#undef HAVE_NLOPT
+
+/* Define to 1 if you have the <nlopt.h> header file. */
+#undef HAVE_NLOPT_H
+
+/* Define if OpenMP is enabled */
+#undef HAVE_OPENMP
+
+/* Define to 1 if you have the 'scm_array_get_handle' function. */
+#undef HAVE_SCM_ARRAY_GET_HANDLE
+
+/* Define to 1 if you have the 'scm_is_array' function. */
+#undef HAVE_SCM_IS_ARRAY
+
+/* Define to 1 if you have the 'scm_make_smob_type' function. */
+#undef HAVE_SCM_MAKE_SMOB_TYPE
+
+/* define if we have SCM_NEWSMOB */
+#undef HAVE_SCM_NEWSMOB
+
+/* Define to 1 if you have the 'scm_new_smob' function. */
+#undef HAVE_SCM_NEW_SMOB
+
+/* define if we have SCM_SMOB_DATA */
+#undef HAVE_SCM_SMOB_DATA
+
+/* define if we have SCM_SMOB_PREDICATE */
+#undef HAVE_SCM_SMOB_PREDICATE
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdio.h> header file. */
+#undef HAVE_STDIO_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define to 1 if you have the 'strncmp' function. */
+#undef HAVE_STRNCMP
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
+
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
+#undef LT_OBJDIR
+
+/* major version */
+#undef MPB_VERSION_MAJOR
+
+/* minor version */
+#undef MPB_VERSION_MINOR
+
+/* patch version */
+#undef MPB_VERSION_PATCH
+
+/* Define if calling Fortran functions directly doesn't work. */
+#undef NO_FORTRAN_FUNCTIONS
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* Define to use complex fields and not to require inversion symmetry */
+#undef SCALAR_COMPLEX
+
+/* Define to use long-double precision */
+#undef SCALAR_LONG_DOUBLE_PREC
+
+/* Define to use single precision */
+#undef SCALAR_SINGLE_PREC
+
+/* Define to 1 if all of the C89 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
+#undef STDC_HEADERS
+
+/* Define to use OpenMP threading. */
+#undef USE_OPENMP
+
+/* Version number of package */
+#undef VERSION
+
+/* Define to support Hermitian/complex dielectric tensors. */
+#undef WITH_HERMITIAN_EPSILON
+
+/* Define to empty if 'const' does not conform to ANSI C. */
+#undef const
+
+/* Define to '__inline__' or '__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
+#undef inline
+#endif

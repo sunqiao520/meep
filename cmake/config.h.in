@@ -1,0 +1,37 @@
+#pragma once
+#define PACKAGE "meep"
+#define PACKAGE_NAME "meep"
+#define PACKAGE_VERSION "@PROJECT_VERSION@"
+#define VERSION "@PROJECT_VERSION@"
+#define HAVE_CXX11 1
+#define HAVE_STDINT_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_STDIO_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_STRING_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_TYPES_H 1
+#cmakedefine HAVE_SYS_TIME_H 1
+#cmakedefine HAVE_IMMINTRIN_H 1
+#cmakedefine HAVE_HDF5 1
+#cmakedefine HAVE_LIBFFTW3 1
+#cmakedefine HAVE_BLAS 1
+#cmakedefine HAVE_LAPACK 1
+#cmakedefine HAVE_CBLAS_DDOT 1
+#cmakedefine HAVE_CBLAS_DAXPY 1
+#cmakedefine HAVE_CTL_PRINTF_CALLBACK 1
+#cmakedefine HAVE_MAKE_MESH_WITH_CENTER 1
+#cmakedefine HAVE_HARMINV 1
+#cmakedefine HAVE_MPB 1
+#cmakedefine HAVE_MPB_PRINTF_CALLBACK 1
+#define F77_FUNC(lower, UPPER) lower
+#define F77_FUNC_(lower, UPPER) lower
+#ifdef _MSC_VER
+#define restrict __restrict
+#else
+#define restrict __restrict__
+#endif
+#cmakedefine HAVE_CXX_PRAGMA 1
+#ifndef HAVE_CXX_PRAGMA
+#define _Pragma(x)
+#endif

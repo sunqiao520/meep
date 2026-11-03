@@ -1,0 +1,961 @@
+; Copyright (C) 1999-2014 Massachusetts Institute of Technology.
+;
+; This program is free software; you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation; either version 2 of the License, or
+; (at your option) any later version.
+;
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+; GNU General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program; if not, write to the Free Software
+; Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+; ****************************************************************
+
+; Get the number of arguments to a function p.  However, some
+; older versions of Guile (e.g. 1.2) do not support the 'arity
+; property, and procedure-property just returns false.  In
+; this case, we assume that the procedure returns 1 argument,
+; as this is the most useful default for our purposes.  Sigh.
+
+(define (procedure-num-args p)
+  (let ((arity (if (defined? 'procedure-minimum-arity)
+                   (procedure-minimum-arity p)
+                   (procedure-property p 'arity))))
+    (if arity (car arity) 1)))
+
+; ****************************************************************
+
+(define-class material-type no-parent)
+
+(define-class medium material-type
+  (define-property epsilon 1.0 'number)
+  (define-property mu 1.0 'number))
+(define dielectric medium) ; backwards compatibility
+
+(define (index n) (epsilon (* n n))) ; convenient substitute for epsilon
+
+(define-class medium-anisotropic material-type
+  (define-property epsilon-diag (vector3 1 1 1) 'vector3)
+  (define-property epsilon-offdiag (vector3 0 0 0) 'cvector3)
+  (define-property
+    epsilon-offdiag-imag (vector3 0 0 0) 'vector3) ; backwards compatibility
+  (define-property mu-diag (vector3 1 1 1) 'vector3)
+  (define-property mu-offdiag (vector3 0 0 0) 'cvector3)
+  (define-property
+    mu-offdiag-imag (vector3 0 0 0) 'vector3) ; backwards compatibility
+)
+(define dielectric-anisotropic medium-anisotropic) ; backwards compatibility
+
+(define-class material-function material-type
+  (define-property material-func no-default 'function
+    (lambda (p) (= 1 (procedure-num-args p)))))
+(define (epsilon-func f) ; convenience wrapper
+  (material-func (lambda (p) (make dielectric (epsilon (f p))))))
+
+; must match material_grid_kinds in mpb.h
+(define U-MIN 0)
+(define U-PROD 1)
+(define U-SUM 2)
+
+(define-class material-grid material-type
+  (define-property material-grid-kind U-MIN 'integer
+    (lambda (k) (and (>= k U-MIN) (<= k U-SUM))))
+  (define-property epsilon-min no-default 'number)
+  (define-property epsilon-max no-default 'number)
+  (define-property mu-min 1.0 'number)
+  (define-property mu-max 1.0 'number)
+  (define-property size no-default 'vector3
+    (lambda (sz) (for-all? (vector->list sz)
+			   (lambda (x) (and (integer? x) (positive? x))))))
+  (define-property matgrid-init (lambda (x y z) 0.5) 'function
+    (lambda (p) (= 3 (procedure-num-args p))))
+  (define-derived-property matgrid 'SCM
+    (lambda (object)
+      (let ((sz (object-property-value object 'size))
+	    (i (object-property-value object 'matgrid-init)))
+	(let ((g (apply make-typed-array
+			(cons 'f64 (cons *unspecified* (map inexact->exact (vector->list sz)))))))
+	  (array-index-map! g (lambda (x y z)
+				(i (- (/ x (vector3-x sz)) 0.5)
+				   (- (/ y (vector3-y sz)) 0.5)
+				   (- (/ z (vector3-z sz)) 0.5))))
+	  g)))))
+
+; use the solid geometry classes, variables, etcetera in libgeom:
+; (one specifications file can include another specifications file)
+(include "@LIBCTL_DIR@/utils/geom.scm")
+
+; define nlopt constants if available
+(if (file-exists? "@LIBCTL_DIR@/utils/nlopt-constants.scm")
+    (include "@LIBCTL_DIR@/utils/nlopt-constants.scm"))
+
+; ****************************************************************
+
+; eigensolver flags (grabbed from eigensolver.h by configure)
+
+; first, we must define a function (pow2 n) to return 2^n:
+(define (pow2 n) (if (<= n 0) 1 (* 2 (pow2 (- n 1)))))
+
+@EIGS_FLAGS_SCM@ ; substituted by configure script
+
+; ****************************************************************
+
+; More input/output variables (besides those defined by libgeom, above).
+
+(define-input-var k-points '() (make-list-type 'vector3))
+
+(define-input-var num-bands 1 'integer)
+(define-input-var tolerance 1.0e-7 'number positive?)
+(define-input-var target-freq 0.0 'number (lambda (x) (>= x 0)))
+
+(define-input-var mesh-size 3 'integer positive?)
+
+(define-input-var epsilon-input-file "" 'string)
+(define-input-var mu-input-file "" 'string)
+(define-input-var force-mu? false 'boolean)
+
+(define-input-var deterministic? false 'boolean)
+
+; Eigensolver minutiae:
+(define-input-var simple-preconditioner? false 'boolean)
+(define-input-var eigensolver-flags EIGS_DEFAULT_FLAGS 'integer)
+(define-input-var eigensolver-block-size -11 'integer)
+(define-input-var eigensolver-nwork 3 'integer positive?)
+(define-input-var eigensolver-davidson? false 'boolean)
+(define-input-output-var eigensolver-flops 0 'number)
+
+(define-output-var freqs (make-list-type 'number))
+(define-output-var iterations 'integer)
+
+(define-output-var parity 'string)
+
+(define-input-var negative-epsilon-ok? false 'boolean)
+(define (allow-negative-epsilon)
+  (set! negative-epsilon-ok? true)
+  (set! target-freq (/ 1 infinity)))
+
+; ****************************************************************
+
+; Definitions of external (C) functions:
+
+; (init-params p true) initializes the geometry, etcetera, and does
+; everything else that's needed to get ready for an eigenvalue
+; calculation with parity p (see below).  This should be called
+; after the input variables are changed.  If false is passed instead
+; of true, fields from a previous run are retained, if possible, as a
+; starting point for the eigensolver.
+(define-external-function init-params true false
+  no-return-value 'integer 'boolean)
+
+(define-external-function using-mu? false false 'boolean)
+
+; (set-parity p) changes the parity that is solved for by
+; solve-kpoint, below.  p should be one of the following constants
+; init-params should already have been called.  Be sure to call
+; (randomize-fields) if you change the parity without calling
+; init-params.
+(define NO-PARITY 0)
+(define EVEN-Z 1)
+(define ODD-Z 2)
+(define EVEN-Y 4)
+(define ODD-Y 8)
+(define TE EVEN-Z)
+(define TM ODD-Z)
+(define PREV-PARITY -1)
+(define-external-function set-parity false false 
+  no-return-value 'integer)
+(define set-polarization set-parity) ; backwards compatibility
+
+; (randomize-fields) initializes the fields to random values; should
+; only be called after init-params.
+(define-external-function randomize-fields false false no-return-value)
+(define-param randomize-fields? false) ; whether to always randomize
+
+; (solve-kpoint kpoint) solves for the specified bands at the given k point.
+; Requires that (init-params) has been called, and does not re-read the
+; input variables, but does write the output vars.
+(define-external-function solve-kpoint false true no-return-value 'vector3)
+
+(define-external-function get-dfield false false no-return-value 'integer)
+(define-external-function get-hfield false false no-return-value 'integer)
+(define-external-function get-bfield false false no-return-value 'integer)
+(define-external-function get-efield-from-dfield false false no-return-value)
+(define-external-function get-epsilon false false no-return-value)
+(define-external-function get-mu false false no-return-value)
+(define-external-function fix-field-phase false false no-return-value)
+(define-external-function compute-field-energy false false 
+	(make-list-type 'number))
+(define-external-function compute-field-divergence false false no-return-value)
+
+(define-external-function get-epsilon-point false false 'number 'vector3)
+(define-external-function get-epsilon-inverse-tensor-point false false 
+  'cmatrix3x3 'vector3)
+(define-external-function get-energy-point false false 'number 'vector3)
+(define get-scalar-field-point get-energy-point)
+(define-external-function get-bloch-field-point false false 'cvector3 'vector3)
+(define-external-function get-field-point false false 'cvector3 'vector3)
+(define-external-function get-bloch-cscalar-point false false 'cnumber 'vector3)
+(define-external-function get-cscalar-point false false 'cnumber 'vector3)
+
+(define-external-function compute-energy-in-dielectric false false
+  'number 'number 'number)
+(define-external-function compute-field-integral false false
+  'cnumber 'function)
+(define-external-function compute-energy-integral false false
+  'number 'function)
+(define-external-function compute-energy-in-object-list false false
+  'number (make-list-type 'geometric-object))
+
+(define-external-function transformed-overlap false false 
+  'cnumber 'matrix3x3 'vector3)
+(define-external-function compute-symmetries false false
+  (make-list-type 'cnumber) 'matrix3x3 'vector3)
+(define-external-function compute-symmetry false false
+  'cnumber 'integer 'matrix3x3 'vector3)
+
+(define-external-function output-field-to-file false false
+  no-return-value 'integer 'string)  
+
+(define-external-function mpi-is-master? false false 'boolean)
+(define-external-function using-mpi? false false 'boolean)
+(define-external-function mpi-num-procs false false 'integer)
+(define-external-function mpi-proc-index false false 'integer)
+(define-external-function mpi-max false false 'number 'number)
+
+(define-external-function has-hermitian-eps? false false 'boolean)
+(define-external-function has-inversion-sym? false false 'boolean)
+
+(define-external-function get-kpoint-index false false 'integer)
+(define-external-function set-kpoint-index false false
+  no-return-value 'integer)
+
+(define-external-function sqmatrix-size false false 'integer 'SCM)
+(define-external-function sqmatrix-ref false false 'cnumber 
+  'SCM 'integer 'integer)
+(define-external-function sqmatrix-set false false no-return-value
+  'SCM 'integer 'integer 'cnumber)
+(define-external-function sqmatrix-mult false false 'SCM
+  'SCM 'SCM)
+(define-external-function sqmatrix-diagm false false 'SCM
+  (make-list-type 'cnumber))
+(define-external-function sqmatrix-eigvals false false (make-list-type 'cnumber)
+  'SCM)
+(define-external-function get-eigenvectors false false 'SCM
+  'integer 'integer)
+(define-external-function set-eigenvectors false false no-return-value
+  'SCM 'integer)
+(define-external-function dot-eigenvectors false false 'SCM
+  'SCM 'integer)
+(define-external-function scale-eigenvector false false no-return-value
+  'integer 'cnumber)
+(define-external-function output-eigenvectors false false no-return-value
+  'SCM 'string)
+(define-external-function input-eigenvectors false false 'SCM 'string 'integer)
+(define-external-function save-eigenvectors false false no-return-value
+  'string)
+(define-external-function load-eigenvectors false false no-return-value
+  'string)
+(define-external-function get-dominant-planewave false false 'vector3 'integer)
+
+(define cur-field 'cur-field)
+(define-external-function cur-field? false false 'boolean 'SCM)
+(define-external-function rscalar-field-make false false 'SCM 'SCM)
+(define-external-function cvector-field-make false false 'SCM 'SCM)
+(define-external-function cvector-field-nonbloch! false false
+  no-return-value 'SCM)
+(define-external-function field-make false false 'SCM 'SCM)
+(define-external-function fields-conform? false false 'boolean 'SCM 'SCM)
+(define-external-function field-set! false false no-return-value 'SCM 'SCM)
+(define (field-copy f) (let ((f' (field-make f))) (field-set! f' f) f'))
+(define-external-function field-load false false no-return-value 'SCM)
+(define-external-function field-mapL! false false no-return-value 'SCM 
+  'function (make-list-type 'SCM))
+(define (field-map! dest f . src) (apply field-mapL! (list dest f src)))
+(define-external-function integrate-fieldL false false 'cnumber
+  'function (make-list-type 'SCM))
+(define (integrate-fields f . src) (apply integrate-fieldL (list f src)))
+(define-external-function rscalar-field-get-point false false 'number 
+  'SCM 'vector3)
+(define-external-function cscalar-field-get-point false false 'cnumber 
+  'SCM 'vector3)
+(define-external-function cvector-field-get-point false false 'cvector3 
+  'SCM 'vector3)
+(define-external-function cvector-field-get-point-bloch false false 'cvector3 
+  'SCM 'vector3)
+
+(define-external-function randomize-material-grid! false false
+  no-return-value 'material-grid 'number)
+(define-external-function save-material-grid false false
+  no-return-value 'material-grid 'string)
+(define-external-function load-material-grid! false false
+  no-return-value 'material-grid 'string 'vector3)
+(define-external-function material-grids-match-epsilon-file! false false
+  no-return-value 'string 'number)
+(define-external-function print-material-grids-gradient false false
+  no-return-value 'integer)
+(define-external-function print-material-grids-deps-du false false
+  no-return-value)
+(define-external-function print-material-grids-deps-du-numeric false false
+  no-return-value 'number)
+(define-external-function material-grids-approx-gradient false false
+  'number 'vector3 'integer 'integer 'number)
+(define-external-function material-grids-maxgap false false
+  'number (make-list-type 'vector3) 'integer 'integer
+  'number 'number 'integer 'number)
+(define-external-function material-grids-mingap false false
+  'number (make-list-type 'vector3) 'integer 'integer
+  'number 'number 'integer 'number)
+(define-external-function material-grids-min-tetm-gap false false
+  'number 'vector3 'integer
+  'number 'number 'integer 'number)
+
+; ****************************************************************
+
+; Set print-ok? to whether or not we are the MPI master process.
+; However, don't try this if we are running within gen-ctl-io,
+; as it won't work.
+(if (not (defined? 'output-source)) ; (a function defined by gen-ctl-io)
+    (set! print-ok? (mpi-is-master?)))
+
+(if (and (not (defined? 'output-source)) (using-mpi?))
+    (set! interactive? false)) ; MPI doesn't support interactive mode
+
+; ****************************************************************
+
+; Utility function to display a comma-delimited list of data for the
+; current k point, prefixed by data-name and the current parity.
+
+(define (display-kpoint-data data-name data)
+  (print parity data-name ":, " (get-kpoint-index))
+  (map (lambda (d) (print ", " d)) data)
+  (print "\n"))
+
+; ****************************************************************
+
+; Computing parities:
+
+(define-external-function compute-zparities false false
+  (make-list-type 'number))
+(define-external-function compute-yparities false false
+  (make-list-type 'number))
+
+(define (display-zparities)
+  (display-kpoint-data "zparity" (compute-zparities)))
+(define (display-yparities)
+  (display-kpoint-data "yparity" (compute-yparities)))
+
+; ****************************************************************
+
+; Computing group velocities:
+
+(define-external-function compute-group-velocity-component false false
+  (make-list-type 'number) 'vector3)
+(define-external-function compute-1-group-velocity-component false false
+  'number 'vector3 'integer)
+(define-external-function compute-1-group-velocity false false
+  'vector3 'integer)
+(define-external-function compute-1-group-velocity-reciprocal false false
+  'vector3 'integer)
+
+; Return a list of the group velocity vector3's, in the cartesian
+; basis (and units of c):
+(define (compute-group-velocities)
+  (let ((vx (compute-group-velocity-component
+	     (cartesian->reciprocal (vector3 1 0 0))))
+	(vy (compute-group-velocity-component
+	     (cartesian->reciprocal (vector3 0 1 0))))
+	(vz (compute-group-velocity-component
+	     (cartesian->reciprocal (vector3 0 0 1)))))
+    (map (lambda (x y z) (vector3 x y z)) vx vy vz)))
+
+; Define a band function to be passed to run, so that you can easily
+; display the group velocities for each k-point.
+(define (display-group-velocities)
+  (display-kpoint-data "velocity" (compute-group-velocities)))
+
+; ****************************************************************
+
+; Add some predefined variables, for convenience:
+
+(define vacuum (make dielectric (epsilon 1.0)))
+(define air vacuum)
+
+(define infinity 1.0e20) ; big number for infinite dimensions of objects
+
+(set! default-material air)
+
+; ****************************************************************
+; ****************************************************************
+
+; The remainder of this file consists of Scheme convenience functions.
+
+; ****************************************************************
+; ****************************************************************
+
+; Interpolate a list of k points, with an interpolation density
+; proportional to the distance in k-space
+(define (kinterpolate-uniform n ks)
+  (map cartesian->reciprocal
+       (interpolate-uniform n (map reciprocal->cartesian ks))))
+
+; Function to convert a k-point k into an equivalent point in the
+; first Brillouin zone (not necessarily the irreducible Brillouin zone):
+(define (first-brillouin-zone k)
+  (define (n k) (vector3-norm (reciprocal->cartesian k)))
+  (define (try+ k v)
+    (if (< (n (vector3+ k v)) (n k)) (try+ (vector3+ k v) v) k))
+  (define (try k v) (try+ (try+ k v) (vector3- (vector3 0) v)))
+  (define trylist (list 
+    #(1 0 0) #(0 1 0) #(0 0 1)
+    #(0 1 1) #(1 0 1) #(1 1 0)
+    #(0 1 -1) #(1 0 -1) #(1 -1 0)
+    #(1 1 1)
+    #(-1 1 1) #(1 -1 1) #(1 1 -1)
+  ))
+  (define (try-all k)
+    (fold-left try k trylist)
+  )
+  (define (try-all&repeat k)
+    (let ((knew (try-all k)))
+      (if (< (n knew) (n k)) (try-all&repeat knew) k)))
+  (let ((k0 (vector3- k (vector-map round k))))
+    (if (< (n k0) (n k)) (try-all&repeat k0) (try-all&repeat k))))
+
+; ****************************************************************
+; functions to manipulate the fields; these are mainly convenient
+; wrappers for the external functions defined previously.
+
+(define (get-efield which-band)
+  (get-dfield which-band)
+  (get-efield-from-dfield))
+
+(define (get-charge-density which-band)
+  (get-efield which-band)
+  (compute-field-divergence))
+
+(define-param filename-prefix "")
+(define (get-filename-prefix)
+  (if (eq? filename-prefix false)
+      ""
+      (if (and (not (null? include-files))
+	       (string-null? filename-prefix))
+	  (string-append
+	   (strip-suffix ".scm"
+	     (strip-suffix ".ctl" (cdr (split-pathname (car include-files)))))
+	   "-")
+	  filename-prefix)))
+
+(define (output-field)
+  (output-field-to-file -1 (get-filename-prefix)))
+
+(define (output-field-x)
+  (output-field-to-file 0 (get-filename-prefix)))
+
+(define (output-field-y)
+  (output-field-to-file 1 (get-filename-prefix)))
+
+(define (output-field-z)
+  (output-field-to-file 2 (get-filename-prefix)))
+
+(define (output-epsilon)
+  (get-epsilon)
+  (output-field-to-file -1 (get-filename-prefix)))
+
+(define (output-mu)
+  (get-mu)
+  (output-field-to-file -1 (get-filename-prefix)))
+
+(define (compute-energy-in-objects . objects)
+  (compute-energy-in-object-list objects))
+
+; ****************************************************************
+; Functions to compute and output gaps, given the lists of frequencies
+; computed at each k point.
+
+; The band-range-data is a list if ((min . k-point) . (max . k-point))
+; pairs, with each pair describing the frequency range of a band and
+; the k-points where it achieves its maximum/minimum.  Here, we update
+; this data with a new list of band frequencies, and return the new
+; data.  If band-range-data is null or too short, the needed entries
+; will be created.
+(define (update-band-range-data band-range-data freqs k-point)
+  (define (ubrd band-range-data freqs br-start)
+    (if (null? freqs)
+	(append (reverse br-start) band-range-data)
+	(let ((br (if (null? band-range-data)
+		      (cons (cons infinity -1) (cons (- infinity) -1))
+		      (car band-range-data)))
+	      (br-rest (if (null? band-range-data) '() (cdr band-range-data))))
+	  (let ((newmin (if (< (car freqs) (caar br))
+			    (cons (car freqs) k-point) (car br)))
+		(newmax (if (> (car freqs) (cadr br))
+			    (cons (car freqs) k-point) (cdr br))))
+	    (ubrd br-rest (cdr freqs) 
+		  (cons (cons newmin newmax) br-start))))))
+  (ubrd band-range-data freqs '()))
+
+; Output the band range data in a nice format:
+(define (output-band-range-data br-data)
+  (define (obr br i)
+    (if (not (null? br))
+	(begin
+	  (print "Band " i " range: " (caaar br) " at " (cdaar br)
+		 " to "  (cadar br) " at " (cddar br) "\n")
+	  (obr (cdr br) (+ i 1)))))
+  (obr br-data 1))
+
+; Output any gaps in the given band ranges, and return a list
+; of the gaps as a list of (percent freq-min freq-max) lists.
+(define (output-gaps band-range-data)
+  (define (ogaps br-cur br-rest i gaps)
+    (if (null? br-rest)
+	(reverse gaps)
+	(if (>= (cadr br-cur) (caaar br-rest))
+	    (ogaps (car br-rest) (cdr br-rest) (+ i 1) gaps)
+	    (let ((gap-size (/ (* 200 (- (caaar br-rest) (cadr br-cur)))
+			       (+ (caaar br-rest) (cadr br-cur)))))
+	      (print "Gap from band " i " (" (cadr br-cur) ") to band "
+		     (+ i 1) " (" (caaar br-rest) "), " gap-size "%\n")
+	      (ogaps (car br-rest) (cdr br-rest) (+ i 1)
+		     (cons (list gap-size (cadr br-cur) (caaar br-rest)) gaps))
+	      ))))
+  (if (null? band-range-data)
+      '()
+      (ogaps (car band-range-data) (cdr band-range-data) 1 '())))
+
+; variables holding the band range data and current list of gaps, in
+; the format returned by update-band-range-data and output-gaps, above:
+(define band-range-data '())
+(define gap-list '())
+
+; Return the frequency gap from the band #lower-band to the band
+; #(lower-band+1), as a percentage of mid-gap frequency.  The "gap"
+; may be negative if the maximum of the lower band is higher than the
+; minimum of the upper band.  (The gap is computed from the
+; band-range-data of the previous run.)
+(define (retrieve-gap lower-band)
+  (if (> (+ lower-band 1) (length band-range-data))
+      (error "retrieve-gap called for higher band than was calculated")
+      (let ((f1 (cadr (list-ref band-range-data (- lower-band 1))))
+	    (f2 (caar (list-ref band-range-data lower-band))))
+	(/ (- f2 f1) (* 0.005 (+ f1 f2))))))
+
+; ****************************************************************
+
+; stuff to keep statistics on the eigensolver performance, for tuning:
+(define eigensolver-iters '()) ; the iterations used, updated by (run)
+(define total-run-time 0.0) ; the total time used by (run) functions (seconds)
+
+(define (display-eigensolver-stats)
+  (let ((num-runs (length eigensolver-iters)))
+    (if (> num-runs 0)
+	(let ((min-iters (apply min eigensolver-iters))
+	      (max-iters (apply max eigensolver-iters))
+	      (mean-iters (/ (fold-right + 0.0 eigensolver-iters) num-runs)))
+	  (print "eigensolver iterations for " num-runs " k-points: "
+		 min-iters "-" max-iters ", mean = "  mean-iters)
+	  (if (defined? 'sort)  ; sort was added in Guile 1.3.x
+	      (let ((sorted-iters (sort eigensolver-iters <)))
+		(let ((median-iters (* 0.5 (+ (list-ref sorted-iters
+							(quotient num-runs 2))
+					      (list-ref sorted-iters
+							(- (quotient 
+							    (+ num-runs 1) 2)
+							   1))))))
+		  (print ", median = " median-iters))))
+	  (print "\nmean flops per iteration = "
+		 (/ eigensolver-flops (* num-runs mean-iters)) "\n")
+	  (print "mean time per iteration = "
+		 (/ total-run-time (* mean-iters num-runs)) " s\n")))))
+
+; ****************************************************************
+
+; Define an easy way for the user to split the k-points list over multiple
+; processes.  k-split-num is the number of chunks to split the k-points into,
+; and k-split-index is the index of the current chunk (0 to k-split-num - 1).
+(define-param k-split-num 1)
+(define-param k-split-index 0)
+
+; Split a list L into num more-or-less equal pieces, returning the piece
+; given by index (in 0..num-1), along with the index in L of the first
+; element of the piece, as a car pair: (first-index . piece-of-L).
+(define (list-split L num index)
+  (define (list-sub L start len index rest)
+    (if (null? L)
+	(reverse rest)
+	(if (and (>= index start) (< index (+ start len)))
+	    (list-sub (cdr L) start len (+ index 1) (cons (car L) rest))
+	    (list-sub (cdr L) start len (+ index 1) rest))))
+  (if (or (>= index num) (negative? index))
+      (cons (length L) '())
+      (let ((block-size (quotient (+ (length L) num -1) num)))
+	(let ((start (* index block-size))
+	      (len (min block-size (- (length L) (* index block-size)))))
+	  (cons start (list-sub L start len 0 '()))))))
+
+; ****************************************************************
+
+(define current-k (vector3 0)) ; current k point in the run function
+(define all-freqs '()) ; list of all freqs computed in a run
+
+; (run) functions, to do vanilla calculations.  They all take zero or
+; more "band functions."  Each function should take a single
+; parameter, the band index, and is called for each band index at
+; every k point.  These are typically used to output the bands.
+
+(define (run-parity p reset-fields . band-functions)
+ (if (and randomize-fields?
+          (not (member randomize-fields band-functions)))
+     (set! band-functions (cons randomize-fields band-functions)))
+ (set! total-run-time (+ total-run-time
+  (begin-time "total elapsed time for run: "
+   (set! all-freqs '())
+   (set! band-range-data '())
+   (set! interactive? false)  ; don't be interactive if we call (run)
+   (begin-time "elapsed time for initialization: "
+	       (init-params p (if reset-fields true false))
+	       (if (string? reset-fields) (load-eigenvectors reset-fields)))
+   (let ((k-split (list-split k-points k-split-num k-split-index)))
+     (set-kpoint-index (car k-split))
+     (if (zero? (car k-split))
+	 (begin 
+           (output-epsilon) ; output epsilon immediately for 1st k block
+           (if (using-mu?) (output-mu)))) ; and mu too, if we have it
+     (if (> num-bands 0)
+	 (begin
+	   (map (lambda (k)
+		  (set! current-k k)
+		  (begin-time "elapsed time for k point: " (solve-kpoint k))
+		  (set! all-freqs (cons freqs all-freqs))
+		  (set! band-range-data 
+			(update-band-range-data band-range-data freqs k))
+		  (set! eigensolver-iters
+			(append eigensolver-iters
+				(list (/ iterations num-bands))))
+		  (map (lambda (f)
+			 (if (zero? (procedure-num-args f))
+			     (f) ; f is a thunk: evaluate once per k-point
+			     (do ((band 1 (+ band 1))) ((> band num-bands))
+			       (f band))))
+		       band-functions))
+		(cdr k-split))
+	   (if (> (length (cdr k-split)) 1)
+	       (begin
+		 (output-band-range-data band-range-data)
+		 (set! gap-list (output-gaps band-range-data)))
+	       (set! gap-list '()))))))))
+ (set! all-freqs (reverse all-freqs)) ; put them in the right order
+ (print "done.\n"))
+
+(define run-polarization run-parity) ; backwards compatibility
+
+; a macro to create a run function with a given name and parity
+(defmacro-public define-run (name parity)
+  `(define (,name . band-functions)
+     (apply run-parity (append (list ,parity true) band-functions))))
+
+(define-run run NO-PARITY)
+(define-run run-zeven EVEN-Z)
+(define-run run-zodd ODD-Z)
+(define-run run-yeven EVEN-Y)
+(define-run run-yodd ODD-Y)
+(define-run run-yeven-zeven (+ EVEN-Y EVEN-Z))
+(define-run run-yeven-zodd (+ EVEN-Y ODD-Z))
+(define-run run-yodd-zeven (+ ODD-Y EVEN-Z))
+(define-run run-yodd-zodd (+ ODD-Y ODD-Z))
+
+(define run-even run-zeven) ; backwards compatibility
+(define run-odd run-zodd) ; backwards compatibility
+(define run-te run-zeven)
+(define run-tm run-zodd)
+(define run-te-yeven run-yeven-zeven)
+(define run-te-yodd run-yodd-zeven)
+(define run-tm-yeven run-yeven-zodd)
+(define run-tm-yodd run-yodd-zodd)
+
+; ****************************************************************
+
+; Some predefined output functions (functions of the band index),
+; for passing to (run).
+
+(define (output-hfield which-band)
+  (get-hfield which-band)
+  (output-field))
+(define (output-hfield-x which-band)
+  (get-hfield which-band)
+  (output-field-x))
+(define (output-hfield-y which-band)
+  (get-hfield which-band)
+  (output-field-y))
+(define (output-hfield-z which-band)
+  (get-hfield which-band)
+  (output-field-z))
+
+(define (output-bfield which-band)
+  (get-bfield which-band)
+  (output-field))
+(define (output-bfield-x which-band)
+  (get-bfield which-band)
+  (output-field-x))
+(define (output-bfield-y which-band)
+  (get-bfield which-band)
+  (output-field-y))
+(define (output-bfield-z which-band)
+  (get-bfield which-band)
+  (output-field-z))
+
+(define (output-dfield which-band)
+  (get-dfield which-band)
+  (output-field))
+(define (output-dfield-x which-band)
+  (get-dfield which-band)
+  (output-field-x))
+(define (output-dfield-y which-band)
+  (get-dfield which-band)
+  (output-field-y))
+(define (output-dfield-z which-band)
+  (get-dfield which-band)
+  (output-field-z))
+
+(define (output-efield which-band)
+  (get-efield which-band)
+  (output-field))
+(define (output-efield-x which-band)
+  (get-efield which-band)
+  (output-field-x))
+(define (output-efield-y which-band)
+  (get-efield which-band)
+  (output-field-y))
+(define (output-efield-z which-band)
+  (get-efield which-band)
+  (output-field-z))
+
+(define (output-bpwr which-band)
+  (get-bfield which-band)
+  (compute-field-energy)
+  (output-field))
+(define output-hpwr output-bpwr) ; backwards compatibility
+
+(define (output-dpwr which-band)
+  (get-dfield which-band)
+  (compute-field-energy)
+  (output-field))
+
+(define (output-charge-density which-band)
+  (get-charge-density which-band)
+  (output-field-to-file -1 (get-filename-prefix)))
+
+(define (get-poynting which-band)
+  (get-efield which-band)                      ; put E in cur-field
+  (let ((e (field-copy cur-field)))            ; ... and copy to local var.
+    (get-hfield which-band)                    ; put H in cur-field
+    (field-map! cur-field                      ; write ExH to cur-field
+		(lambda (e h) (vector3-cross (vector3-conj e) h))
+		e cur-field)
+    (cvector-field-nonbloch! cur-field)))
+(define (output-poynting which-band)
+  (get-poynting which-band)
+  (output-field-to-file -1 (string-append (get-filename-prefix) "flux.")))
+(define (output-poynting-x which-band)
+  (get-poynting which-band)
+  (output-field-to-file 0 (string-append (get-filename-prefix) "flux.")))
+(define (output-poynting-y which-band)
+  (get-poynting which-band)
+  (output-field-to-file 1 (string-append (get-filename-prefix) "flux.")))
+(define (output-poynting-z which-band)
+  (get-poynting which-band)
+  (output-field-to-file 2 (string-append (get-filename-prefix) "flux.")))
+
+(define (get-tot-pwr which-band)
+  (get-dfield which-band)
+  (compute-field-energy)
+  (let ((epwr (field-copy cur-field))
+        (tot-pwr (rscalar-field-make cur-field)))
+    (get-bfield which-band)
+    (compute-field-energy)
+    (field-map! tot-pwr
+                (lambda (epwr hpwr) (+ epwr hpwr))
+                epwr cur-field)
+    (field-load tot-pwr)))
+(define (output-tot-pwr which-band)
+  (get-tot-pwr which-band)
+  (output-field-to-file -1 (string-append (get-filename-prefix) "tot.")))
+
+; We need a special function to evaluate band functions, since
+; band functions can either be a function of the band number or
+; a thunk (function of no arguments, evaluated once per k-point).
+(define (apply-band-func-thunk band-func which-band eval-thunk?)
+  (if (zero? (procedure-num-args band-func))
+      (if eval-thunk? (band-func)) ; evaluate thunks once per k-point
+      (band-func which-band)))
+(define (apply-band-func band-func which-band)
+  (apply-band-func-thunk band-func which-band (= which-band 1)))
+
+; The following function returns an output function that calls
+; output-func for bands with D energy in objects > min-energy.
+; For example, (output-dpwr-in-objects output-dfield 0.20 some-object)
+; would return an output function that would spit out the D field
+; for bands with at least %20 of their D energy in some-object.
+(define (output-dpwr-in-objects output-func min-energy . objects)
+  (lambda (which-band)
+    (get-dfield which-band)
+    (compute-field-energy)
+    (let ((energy (compute-energy-in-object-list objects)))
+        ; output the computed energy for grepping:
+	(print "dpwr:, " which-band ", "
+	       (list-ref freqs (- which-band 1)) ", " energy "\n")
+	(if (>= energy min-energy)
+	    (apply-band-func output-func which-band)))))
+
+; Combines zero or more band functions into one:
+(define (combine-band-functions . band-funcs)
+  (lambda (which-band)
+    (map (lambda (f) (apply-band-func f which-band)) band-funcs)))
+
+; Only invoke the given band functions for the specified k-point:
+(define (output-at-kpoint kpoint . band-funcs)
+  (let ((band-func (apply combine-band-functions band-funcs)))
+    (lambda (which-band)
+      (if (vector3-close? current-k kpoint (* 1e-8 (vector3-norm kpoint)))
+	  (band-func which-band)))))
+
+; Band functions to pick a canonical phase for the eigenstate of the
+; given band based upon the spatial representation of the given field:
+(define (fix-hfield-phase which-band)
+  (get-hfield which-band)
+  (fix-field-phase))
+(define (fix-bfield-phase which-band)
+  (get-bfield which-band)
+  (fix-field-phase))
+(define (fix-dfield-phase which-band)
+  (get-dfield which-band)
+  (fix-field-phase))
+(define (fix-efield-phase which-band)
+  (get-efield which-band)
+  (fix-field-phase))
+
+; ****************************************************************
+; Here, we solve the inverse problem, that of solving for the
+; wavevectors for a set of bands at a given frequency.  To do
+; this, we use the fact that we can compute the group velocities
+; cheaply, and thus can employ find-root-deriv (Newton's method).
+; Moreover, we save information gathered while finding the k's of
+; higher bands to speed the computation for lower bands.
+
+(define (find-k p omega band-min band-max korig-and-kdir
+		tol kmag-guess kmag-min kmag-max . band-funcs)
+  (define (ncdr n lst) (if (> n 0) (ncdr (- n 1) (cdr lst)) lst))
+  (define korig (if (pair? korig-and-kdir) (car korig-and-kdir) (vector3 0)))
+  (define kdir (if (pair? korig-and-kdir) (cdr korig-and-kdir) korig-and-kdir))
+  (let ((num-bands-save num-bands) (k-points-save k-points)
+	(nb (- band-max band-min -1)) 
+	(kdir1 (cartesian->reciprocal (unit-vector3 (reciprocal->cartesian kdir))))
+	; k0s is an array caching the best k value found for each band:
+	(k0s (if (list? kmag-guess) (list->vector kmag-guess)
+		 (make-vector (- band-max band-min -1) kmag-guess)))
+	; bktab is a table (assoc. list) to memoize all (band . k) results:
+	(bktab '()))
+    (define (rootfun b) (lambda (k)
+      (let ((tab-val (assoc (cons b k) bktab))) ; first, look in cached table
+	(if tab-val 
+	    (begin ; use cached result if available
+	      (print "find-k " b " at " k ": " (cadr tab-val) " (cached)\n")
+	      (cdr tab-val))
+	    (begin ; otherwise, compute bands and cache results
+	      (set! num-bands b)
+	      (set! k-points (list (vector3+ korig (vector3-scale k kdir1))))
+	      (run-parity p false)
+	      (let ((v (compute-group-velocity-component kdir1)))
+		; cache computed values:
+		(map (lambda (b f v)
+		       (let ((tabval (assoc 
+				      (cons b (vector-ref k0s (- b band-min)))
+				      bktab)))
+			 (if (or (not tabval)
+				 (< (abs (- f omega)) (abs (cadr tabval))))
+			     (vector-set! k0s (- b band-min) k))) ; cache k0
+		       (set! bktab (cons (cons (cons b k) (cons (- f omega) v))
+					 bktab)))
+		     (arith-sequence band-min 1 (- b band-min -1)) 
+		     (ncdr (- band-min 1) freqs)
+		     (ncdr (- band-min 1) v))
+		; finally return (frequency - omega . derivative):
+		(let ((fun (- (car (reverse freqs)) omega)))
+		  (print "find-k " b " at " k ": " fun "\n")
+		  (cons fun (car (reverse v))))))))))
+    (randomize-fields) ; don't let previous computations interfere
+    (let ((ks (reverse (map
+			(lambda (b)
+			  (find-root-deriv (rootfun b) tol kmag-min kmag-max
+					   (vector-ref k0s (- b band-min))))
+			(arith-sequence band-max -1 nb)))))
+      (if (not (null? band-funcs))
+	  (map (lambda (b k)
+		 (set! num-bands b)
+		 (set! k-points (list (vector3+ korig (vector3-scale k kdir1))))
+		 (run-parity p false
+			     (lambda (b')
+			       (if (= b' b)
+				   (map (lambda (f) 
+					  (apply-band-func-thunk f b true))
+					band-funcs)))))
+	       (arith-sequence band-max -1 nb) (reverse ks)))
+      (set! num-bands num-bands-save)
+      (set! k-points k-points-save)
+      (print parity "kvals:, " omega ", " band-min ", " band-max)
+      (vector-map (lambda (k) (print ", " k)) korig)
+      (vector-map (lambda (k) (print ", " k)) kdir1)
+      (map (lambda (k) (print ", " k)) ks) 
+      (print "\n")
+      ks)))
+
+; ****************************************************************
+
+(define (sqmatrix-diag m)
+  (map (lambda (i) (sqmatrix-ref m i i))
+       (arith-sequence 0 1 (sqmatrix-size m))))
+
+(define (fix-phase-consistency old-eigs first-band)
+  (let ((dots (dot-eigenvectors old-eigs first-band)))
+    (let ((phases (map (lambda (d) (conj (make-polar 1 (angle d))))
+		       (sqmatrix-diag dots))))
+      (map (lambda (i phase) 
+	     (scale-eigenvector i phase)
+	     (conj phase))
+	   (arith-sequence first-band 1 (length phases)) phases))))
+
+; ****************************************************************
+
+; find the smallest integer >= N that has prime factors all <= 7
+(define (next-factor2357 N)
+  (define (factor2357? N)
+    (define (divby N p)
+      (if (zero? (remainder N p))
+          (divby (quotient N p) p)
+          N))
+    (= 1 (divby (divby (divby (divby N 2) 3) 5) 7)))
+  (if (factor2357? N) N (next-factor2357 (+ N 1))))
+
+; Round the grid size to the next highly-composite size, for FFT efficiency
+(define (optimize-grid-size!)
+  (set! grid-size false)
+  (set! grid-size (vector-map next-factor2357 (get-grid-size))))
+
+; ****************************************************************
+
+; Load GNU Readline support, for easier command-line editing support.
+; This is not loaded in by default in Guile 1.3.2+ because readline
+; is licensed under the GPL, which would have caused Guile to effectively
+; be under the GPL itself.  However, since the MIT Photonic Bands package
+; is under the GPL too, we can load Readline by default with no problems.
+
+@ACTIVATE_READLINE@  ; command to activate readline is determined by configure
+
+(ctl-set-prompt! "mpb> ")
+
+; ****************************************************************

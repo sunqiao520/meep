@@ -1,0 +1,228 @@
+#!/bin/sh
+
+# libctl: flexible Guile-based control files for scientific software
+# Copyright (C) 1998, 1999, 2000, 2001, 2002, Steven G. Johnson
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the
+# Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+# Boston, MA  02111-1307, USA.
+#
+# Steven G. Johnson can be contacted at stevenj@alum.mit.edu.
+
+code=false
+header=false
+cxx=false
+swig=false
+c_only=false
+output_file=""
+
+while test $# -ge 1; do
+    case $1 in
+        -o) shift; output_file=$1 ;;
+        --cxx) cxx=true ;;
+        --code) code=true; header=false; swig=false ;;
+        --header) header=true; code=false; swig=false ;;
+        --swig) swig=true; header=false; code=false ;;
+        --c-only) c_only=true ;;
+        *) break;;
+    esac
+    shift
+done
+
+if test $code = true; then
+    if test $cxx = true; then
+	default_output_file=ctl-io.cpp
+    else
+	default_output_file=ctl-io.c
+    fi
+elif test $header = true; then
+    if test $cxx = true; then
+	default_output_file=ctl-io.hpp
+    else
+	default_output_file=ctl-io.h
+    fi
+elif test $swig = true; then
+    default_output_file=ctl-io.i
+else
+#   No output specified.  Backwards compatibility mode (code + header output).
+    $0 --header $*
+    $0 --code $*
+    exit 0
+fi
+
+if test "x$output_file" = x; then
+    output_file=$default_output_file
+fi
+
+spec_file=$1
+if test ! -f "$spec_file"; then
+    echo "cannot read specification file $spec_file"
+    exit 1
+fi
+
+if test "$#" = "2"; then
+    libctl_dir="$2"
+else
+    prefix="@prefix@"
+    datarootdir="@datarootdir@"
+    libctl_dir="@datadir@/libctl"
+fi
+case $libctl_dir in .*) libctl_dir=`pwd`/$libctl_dir ;; esac
+if test ! -r $libctl_dir/utils/ctl-io.scm; then
+    echo "couldn't find $libctl_dir/utils/ctl-io.scm"
+    exit 1
+fi
+
+ok=yes
+
+###########################################################################
+
+if test $header = true; then
+
+rm -f $output_file
+
+cat > $output_file <<EOF
+/* THIS FILE WAS AUTOMATICALLY GENERATED.  DO NOT MODIFY! */
+/* generated from the file: $spec_file */
+
+#ifndef CTL_IO_H
+#define CTL_IO_H
+
+#include <ctl.h>
+
+EOF
+
+if test $cxx = true; then
+    cat >> $output_file <<EOF
+#define CXX_CTL_IO 1
+namespace ctlio {
+EOF
+else
+    cat >> $output_file <<EOF
+#ifdef __cplusplus
+extern "C" {
+#endif                          /* __cplusplus */
+EOF
+fi
+
+echo >> $output_file
+
+(@GUILE@ -l $libctl_dir/base/include.scm \
+      -c "(include "'"'"$libctl_dir/base/ctl.scm"'"'") (include "'"'"$libctl_dir/utils/ctl-io.scm"'"'") (set"'!'" cxx $cxx) (include "'"'"$spec_file"'"'") (set! ctl-io-c-only? $c_only) (output-header)" >> $output_file) || ok=no
+
+if test $ok = no; then rm -f $output_file; exit 1; fi
+
+echo >> $output_file
+
+if test $cxx = true; then
+    cat >> $output_file <<EOF
+} /* namespace */
+EOF
+else
+    cat >> $output_file <<EOF
+#ifdef __cplusplus
+}                               /* extern "C" */
+#endif                          /* __cplusplus */
+EOF
+fi
+
+cat >> $output_file <<EOF
+
+#endif                          /* CTL_IO_H */
+
+EOF
+
+if test $cxx = false; then
+  @INDENT@ $output_file > /dev/null 2>&1
+  rm -f ${output_file}~ ${output_file}.BAK
+fi
+
+fi # header = true
+
+###########################################################################
+
+if test $code = true; then
+
+rm -f $output_file
+
+cat > $output_file <<EOF
+/* THIS FILE WAS AUTOMATICALLY GENERATED.  DO NOT MODIFY! */
+/* generated from the file: $spec_file */
+
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "ctl-io.h"
+
+#ifdef CXX_CTL_IO
+using namespace ctlio;
+#endif
+
+EOF
+
+(@GUILE@ -l $libctl_dir/base/include.scm \
+      -c "(include "'"'"$libctl_dir/base/ctl.scm"'"'") (include "'"'"$libctl_dir/utils/ctl-io.scm"'"'") (set"'!'" cxx $cxx) (include "'"'"$spec_file"'"'") (set! ctl-io-c-only? $c_only) (output-source)" >> $output_file) || ok=no
+
+if test $ok = no; then rm -f $output_file; exit 1; fi
+
+if test $cxx = false; then
+  @INDENT@ $output_file > /dev/null 2>&1
+  rm -f ${output_file}~ ${output_file}.BAK
+fi
+
+fi # code = true
+
+###########################################################################
+
+if test $swig = true; then
+
+    cat > $output_file <<EOF
+/* THIS FILE WAS AUTOMATICALLY GENERATED.  DO NOT MODIFY! */
+/* generated from the file: $spec_file */
+
+EOF
+
+    (@GUILE@ -l $libctl_dir/base/include.scm \
+      -c "(include "'"'"$libctl_dir/base/ctl.scm"'"'") (include "'"'"$libctl_dir/utils/ctl-io.scm"'"'") (set"'!'" cxx $cxx) (include "'"'"$spec_file"'"'") (output-swig-header)" >> $output_file) || ok=no
+
+    if test $ok = no; then rm -f $output_file; exit 1; fi
+
+    cat >> $output_file <<EOF
+
+/******* SWIG type-conversion mappings for basic libctl types *******/
+
+%typemap(in) vector3 { \$1 = ctl_convert_vector3_to_c(\$input); }
+%typemap(out) vector3 { \$result = ctl_convert_vector3_to_scm(\$1); }
+
+%typemap(in) matrix3x3 { \$1 = ctl_convert_matrix3x3_to_c(\$input); }
+%typemap(out) matrix3x3 { \$result = ctl_convert_matrix3x3_to_scm(\$1); }
+
+%typemap(in) cvector3 { \$1 = ctl_convert_cvector3_to_c(\$input); }
+%typemap(out) cvector3 { \$result = ctl_convert_cvector3_to_scm(\$1); }
+
+%typemap(in) cmatrix3x3 { \$1 = ctl_convert_cmatrix3x3_to_c(\$input); }
+%typemap(out) cmatrix3x3 { \$result = ctl_convert_cmatrix3x3_to_scm(\$1); }
+
+%typemap(in) cnumber { \$1 = ctl_convert_cnumber_to_c(\$input); }
+%typemap(out) cnumber { \$result = ctl_convert_cnumber_to_scm(\$1); }
+
+%typemap(in) function { \$1 = ctl_convert_function_to_c(\$input); }
+%typemap(out) function { \$result = ctl_convert_function_to_scm(\$1); }
+
+%typemap(in) object { \$1 = ctl_convert_object_to_c(\$input); }
+%typemap(out) object { \$result = ctl_convert_object_to_scm(\$1); }
+
+EOF
+
+fi

@@ -1,0 +1,58 @@
+[
+  {
+    "repository": "NanoComp/meep",
+    "tag": "v1.35.0",
+    "url": "https://github.com/NanoComp/meep/releases/download/v1.35.0/meep-1.35.0.tar.gz",
+    "sha256": "4334a0c0d7dc302595e17519e35d93c64cdbb4d2944f2e9ae3ddf500265639a0",
+    "destination": "."
+  },
+  {
+    "repository": "NanoComp/libctl",
+    "tag": "v4.7.1",
+    "url": "https://github.com/NanoComp/libctl/releases/download/v4.7.1/libctl-4.7.1.tar.gz",
+    "sha256": "e023b4a3b6975b45260bcf343f305a62f2a7988c7349bc0dacc1208ccbf7b6b5",
+    "destination": "third_party/libctl"
+  },
+  {
+    "repository": "NanoComp/harminv",
+    "tag": "v1.4.3",
+    "url": "https://github.com/NanoComp/harminv/releases/download/v1.4.3/harminv-1.4.3.tar.gz",
+    "sha256": "883b29a126bd5ba00ccf804b986e568980d39a53ec8f86ae05a43ca6c107cc38",
+    "destination": "third_party/harminv"
+  },
+  {
+    "repository": "NanoComp/mpb",
+    "tag": "v1.12.0",
+    "url": "https://github.com/NanoComp/mpb/releases/download/v1.12.0/mpb-1.12.0.tar.gz",
+    "sha256": "8d2b206254b217f66a53c1ad20cc0c369b93b0e71ee671d68e333a583eaaeda4",
+    "destination": "third_party/mpb"
+  },
+  {
+    "repository": "HDFGroup/hdf5",
+    "tag": "hdf5_1.14.6",
+    "url": "https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.6/hdf5-1.14.6.tar.gz",
+    "sha256": "e4defbac30f50d64e1556374aa49e574417c9e72c6b1de7a4ff88c4b1bea6e9b",
+    "destination": "third_party/hdf5"
+  },
+  {
+    "repository": "NanoComp/meep",
+    "tag": "v1.35.0",
+    "url": "https://raw.githubusercontent.com/NanoComp/meep/v1.35.0/python/vec.i",
+    "sha256": "3f56ebf2730a7ac5d52d5cb4365c62edc111aa7d86e1e5adbf745663118e81a1",
+    "destination": "python/vec.i"
+  },
+  {
+    "repository": "NanoComp/meep",
+    "tag": "v1.35.0",
+    "url": "https://raw.githubusercontent.com/NanoComp/meep/v1.35.0/python/numpy.i",
+    "sha256": "b2370ae4e23b276d902df7e6f866496c214a2fbeea54bb2ee37776735ddddc0f",
+    "destination": "python/numpy.i"
+  },
+  {
+    "repository": "NanoComp/meep",
+    "tag": "v1.35.0",
+    "url": "https://raw.githubusercontent.com/NanoComp/meep/v1.35.0/python/mpb.i",
+    "sha256": "3434aa164c90db647bead3148f34e8cc8b61c0ffc5c45af676f8969262cb2902",
+    "destination": "python/mpb.i"
+  }
+]

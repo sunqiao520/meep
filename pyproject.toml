@@ -1,0 +1,27 @@
+[build-system]
+requires = ["scikit-build-core>=0.11", "numpy>=2.0", "swig>=4.3"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pymeep"
+version = "1.35.0+msvc2"
+description = "Native Windows MSVC port of Meep with an Intel oneMKL CPU backend"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "GPL-2.0-or-later" }
+dependencies = ["numpy>=2.0", "scipy", "matplotlib", "h5py"]
+
+[project.optional-dependencies]
+adjoint = ["autograd>=1.7"]
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+build-dir = "out/build/windows-msvc-release"
+wheel.packages = []
+install.components = ["Python"]
+sdist.exclude = [".venv/**", ".venv-wheel/**", ".cache/**", ".vs/**", "build/**", "out/**", "dist/**", "windows.local.json"]
+
+[tool.scikit-build.cmake.define]
+MEEP_BUILD_TESTS = "OFF"
+MEEP_BUILD_EXAMPLES = "OFF"
+MEEP_BUILD_SCHEME = "OFF"
